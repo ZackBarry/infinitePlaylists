@@ -3,7 +3,6 @@ import config as C
 import pandas as pd
 import numpy as np
 import logging
-from pandas.io.json import json_normalize
 import json
 from datetime import datetime
 import os
@@ -108,53 +107,74 @@ def get_category_playlists(category_id='', country='US', url='https://api.spotif
         return response.json()
 
 
-def get_playlist_songs(playlist_id='7Anb1HtKdhvK3Pb1d36f22'):
-    # TODO: add paging here if a playlist has > 100 songs
+def get_playlist(url):
     response = requests.get(
-        url='https://api.spotify.com/v1/playlists/{playlist_id}/tracks'.format(playlist_id=playlist_id),
+        url=url,
         headers={'Authorization': 'Bearer ' + get_access_token()}
     )
-
-    return response
-
-# response.json()['next'] to check if more than 100 tracks
-# pd.json_normalize(result.json()['items'])
+    return response.json()
 
 
-def get_playlist_details(playlist_id='7Anb1HtKdhvK3Pb1d36f22'):
+def get_entire_playlist(playlist_id='42gxpKWSAzT5k05nIzP3O2'):
 
-    response = requests.get(
-        url='https://api.spotify.com/v1/playlists/{playlist_id}'.format(playlist_id=playlist_id),
-        headers={'Authorization': 'Bearer ' + get_access_token()}
+    url = 'https://api.spotify.com/v1/playlists/{playlist_id}/tracks'.format(playlist_id=playlist_id)
+
+    json_response = get_playlist(url)
+    df = pd.json_normalize(json_response['items'])
+    next_url = json_response['next']
+
+    while next_url is not None:
+        json_response = get_playlist(next_url)
+        df = df.append(pd.json_normalize(json_response['items']))
+        next_url = json_response['next']
+
+    return df
+
+
+def get_playlist_details(playlist_id='42gxpKWSAzT5k05nIzP3O2'):
+
+    df = get_entire_playlist(playlist_id)
+
+    df_columns = df.columns.str
+    album_cols = np.logical_and(df_columns.startswith('track.album'),
+                                ~df_columns.startswith('track.album.artists'))
+    artist_cols = df_columns.startswith('track.artists')
+    playlist_cols = ~df_columns.startswith('track.')
+    track_cols = np.logical_and.reduce((df_columns.startswith('track.'),
+                                        ~df_columns.startswith('track.album.artists'),
+                                        ~album_cols,
+                                        ~artist_cols))
+    track_id_col = df_columns.startswith('track.id')
+
+    album_df_cols = np.logical_or(album_cols, track_id_col)
+    artist_df_cols = np.logical_or(artist_cols, track_id_col)
+    playlist_df_cols = np.logical_or(playlist_cols, track_id_col)
+    track_df_cols = track_cols
+
+    album_df = df[df.columns[album_df_cols]]
+    artist_df = df[df.columns[artist_df_cols]]
+    playlist_df = df[df.columns[playlist_df_cols]]
+    track_df = df[df.columns[track_df_cols]]
+
+    def expand_artist_rows(artist_row):
+        df = pd.json_normalize(artist_row['track.artists'])
+        df.insert(0, column='track.id', value=artist_row['track.id'])
+        df.insert(0, column='artist_order', value=np.arange(len(df)))
+        return df
+
+    final_artist_df = pd.concat(
+        [expand_artist_rows(artist_df.iloc[i]) for i in range(0, len(artist_df))]
     )
 
-    return response
+    playlist_df.insert(0, column='id', value=playlist_id)
+    playlist_df.insert(1, column='track_no', value=np.arange(len(track_df)))
 
-# pd.json_normalize(result.json())
-# we just want track details, not details about who/when added the track
-result = get_playlist_songs()
-df = pd.json_normalize(result.json()['items'])
-df = df.filter(regex='track.*')
-track_df = df.filterdrop(regex='track.album.[a-zA-Z^{id}]')
-df.insert(0, column='track_index', value=np.arange(len(df)))
-
-track_df_cols = np.logical_or.reduce((
-    df.columns.str.contains(r'^(?!track.album)'),
-    df.columns.str.contains('track.album.id')
-))
-
-album_df_cols = df.columns.str.startswith('track.album')
-
-artist_df_cols = np.logical_or(
-    df.columns.str.startswith('track.artists'),
-    df.columns.str.startswith('track.id')
-)
-
-track_df = df[df.columns[track_df_cols]]
-album_df = df[df.columns[album_df_cols]]
-artist_df = df[df.columns[artist_df_cols]]
+    album_df.columns = album_df.columns.str.replace('track.album.', '')
+    album_df.columns = album_df.columns.str.replace('.', '_')
+    final_artist_df.columns = final_artist_df.columns.str.replace('.', '_')
+    playlist_df.columns = playlist_df.columns.str.replace('.', '_')
+    track_df.columns = track_df.columns.str.replace('track.', '')
+    track_df.columns = track_df.columns.str.replace('.', '_')
 
 
-# artists
-art = df.iloc[0]['track.artists']
-pd.json_normalize(art).keys()
+
