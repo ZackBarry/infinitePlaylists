@@ -9,26 +9,68 @@ import os
 import re
 
 
-def get_access_token():
-    #return 'BQD7ur_P_ehqnCkMt_xPPVggKXNiiXsK2-XhYmXGz3Xthysrgq5z98H7J8jb7VLrlp-0rFLPC-BHQYgpCf4'
-    # use global variable so that only refreshes once every 3600 seconds (once per hour)
-    # https://developer.spotify.com/documentation/ios/guides/token-swap-and-refresh/
-    client_id, client_secret = C.default['client_id'], C.default['client_secret']
+class Extract:
 
-    url = 'https://accounts.spotify.com/api/token'
-    grant_type = 'client_credentials'
-    body_params = {'grant_type': grant_type}
+    def __init__(self):
+        self.client_id = C.default['client_id']
+        self.client_secret = C.default['client_secret']
 
-    response = requests.post(url, data=body_params, auth=(client_id, client_secret))
+    def get_access_token(self):
+        # use global variable so that only refreshes once every 3600 seconds (once per hour)
+        # https://developer.spotify.com/documentation/ios/guides/token-swap-and-refresh/
+        url = 'https://accounts.spotify.com/api/token'
+        body_params = {'grant_type': 'client_credentials'}
 
-    if response.status_code == 200:
+        response = requests.post(url, data=body_params, auth=(self.client_id, self.client_secret))
 
-        # Get the json data
-        json_data = response.json()
-        return json_data['access_token']
+        if response.status_code == 200:
 
-    else:
-        print(f"{response.status_code} Error in API call")
+            # Get the json data
+            json_data = response.json()
+            return json_data['access_token']
+
+        else:
+            print(f"{response.status_code} Error in API call")
+
+    def get_spotify_data(self, url):
+        response = requests.get(
+            url=url,
+            headers={'Authorization': 'Bearer ' + Extract.get_access_token(self)}
+        )
+        return response.json()
+
+    def get_playlist_data(self, params):
+        # playlist_id='42gxpKWSAzT5k05nIzP3O2'
+
+        url = 'https://api.spotify.com/v1/playlists/{playlist_id}/tracks'.format(playlist_id=params['playlist_id'])
+
+        json_response = Extract.get_spotify_data(self, url)
+        df = pd.json_normalize(json_response['items'])
+        next_url = json_response['next']
+
+        while next_url is not None:
+            json_response = get_playlist(next_url)
+            df = df.append(pd.json_normalize(json_response['items']))
+            next_url = json_response['next']
+
+        df.insert(0, column='id', value=params['playlist_id'])
+        df.insert(1, column='track_no', value=np.arange(len(df)))
+        return df
+
+    def extract_spotify_data(self, what, params):
+        if what == 'playlist':
+            return Extract.get_playlist_data(self, params)
+        else:
+            return -1
+
+
+class Transform:
+
+    def __init__(self):
+
+        extract_obj = Extract()
+
+
 
 
 def get_category_ids(categories_json):
