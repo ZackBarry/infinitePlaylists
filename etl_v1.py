@@ -131,30 +131,37 @@ def get_entire_playlist(playlist_id='42gxpKWSAzT5k05nIzP3O2'):
     return df
 
 
+ALBUM_COLS = [  # need to condense album.images
+    'track.album.id', 'track.album.name', 'track.album.album_type',
+    'track.album.release_date', 'track.album.total_tracks', 'track.album.images',
+    'track.album.href', 'track.album.uri'
+]
+
+ARTIST_COLS = [
+    'track.artists', 'track.id'
+]
+
+TRACK_COLS = [
+    'track.id', 'track.name', 'track.explicit',
+    'track.popularity', 'track.duration_ms',
+    'track.album.id', 'track.disc_number', 'track.track_number',
+    'track.href', 'track.uri'
+]
+
+PLAYLIST_COLS = [
+    'track.id', 'added_at', 'primary_color',
+    'added_by.href', 'added_by.id',
+]
+
+
 def get_playlist_details(playlist_id='42gxpKWSAzT5k05nIzP3O2'):
 
     df = get_entire_playlist(playlist_id)
 
-    df_columns = df.columns.str
-    album_cols = np.logical_and(df_columns.startswith('track.album'),
-                                ~df_columns.startswith('track.album.artists'))
-    artist_cols = df_columns.startswith('track.artists')
-    playlist_cols = ~df_columns.startswith('track.')
-    track_cols = np.logical_and.reduce((df_columns.startswith('track.'),
-                                        ~df_columns.startswith('track.album.artists'),
-                                        ~album_cols,
-                                        ~artist_cols))
-    track_id_col = df_columns.startswith('track.id')
-
-    album_df_cols = np.logical_or(album_cols, track_id_col)
-    artist_df_cols = np.logical_or(artist_cols, track_id_col)
-    playlist_df_cols = np.logical_or(playlist_cols, track_id_col)
-    track_df_cols = track_cols
-
-    album_df = df[df.columns[album_df_cols]]
-    artist_df = df[df.columns[artist_df_cols]]
-    playlist_df = df[df.columns[playlist_df_cols]]
-    track_df = df[df.columns[track_df_cols]]
+    album_df = df[ALBUM_COLS]
+    artist_df = df[ARTIST_COLS]
+    playlist_df = df[PLAYLIST_COLS]
+    track_df = df[TRACK_COLS]
 
     def expand_artist_rows(artist_row):
         df = pd.json_normalize(artist_row['track.artists'])
