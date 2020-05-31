@@ -54,7 +54,7 @@ class Extract:
             next_url = json_response['next']
 
         df.insert(0, column='id', value=params['playlist_id'])
-        df.insert(1, column='track_no', value=np.arange(len(df)))
+        df.insert(0, column='track_no', value=np.arange(len(df)))
         return df
 
     def extract_spotify_data(self, what, params):
@@ -66,9 +66,84 @@ class Extract:
 
 class Transform:
 
-    def __init__(self):
+    ALBUM_COLS = [  # need to condense album.images
+        'track.album.id', 'track.album.name', 'track.album.album_type',
+        'track.album.release_date', 'track.album.total_tracks', 'track.album.images',
+        'track.album.href', 'track.album.uri'
+    ]
+
+    ARTIST_COLS = [
+        'track.artists', 'track.id'
+    ]
+
+    TRACK_COLS = [
+        'track.id', 'track.name', 'track.explicit',
+        'track.popularity', 'track.duration_ms',
+        'track.album.id', 'track.disc_number', 'track.track_number',
+        'track.href', 'track.uri'
+    ]
+
+    PLAYLIST_COLS = [
+        'track.id', 'added_at', 'primary_color',
+        'added_by.href', 'added_by.id',
+    ]
+
+    def __init__(self, what, params_list):
 
         extract_obj = Extract()
+        self.what = what
+        self.params_list = params_list
+
+        self.data = [extract_obj.extract_spotify_data('playlist', params=params) for params in params_list]  # if check_condition(params)
+
+        self.albums = [Transform.get_album_from_playlist(df=df) for df in self.data]
+        self.artists = [Transform.get_artist_from_playlist(df=df) for df in self.data]
+        self.playlists = [Transform.get_playlist_from_playlist(df=df) for df in self.data]
+        self.track = [Transform.get_tracks_from_playlist(df=df) for df in self.data]
+
+    @staticmethod
+    def get_album_from_playlist(df):
+        out_df = df[Transform.ALBUM_COLS]
+        out_df.columns = out_df.columns.str.replace('track.album.', '')
+        out_df.columns = out_df.columns.str.replace('.', '_')
+        return out_df
+
+    @staticmethod
+    def get_artist_from_playlist(df):
+
+        def expand_artist_rows(artist_row):
+            artist_df = pd.json_normalize(artist_row['track.artists'])
+            artist_df.insert(0, column='track.id', value=artist_row['track.id'])
+            artist_df.insert(0, column='artist_order', value=np.arange(len(artist_df)))
+            return artist_df
+
+        out_df = df[Transform.ARTIST_COLS]
+        out_df = pd.concat(
+            [expand_artist_rows(out_df.iloc[i]) for i in range(0, len(out_df))]
+        )
+        out_df.columns = out_df.columns.str.replace('.', '_')
+
+        return out_df
+
+    @staticmethod
+    def get_playlist_from_playlist(df):
+        out_df = df[Transform.PLAYLIST_COLS]
+        out_df.columns = out_df.columns.str.replace('.', '_')
+        return out_df
+
+    @staticmethod
+    def get_tracks_from_playlist(df):
+        out_df = df[Transform.TRACK_COLS]
+        out_df.columns = out_df.columns.str.replace('track.', '')
+        out_df.columns = out_df.columns.str.replace('.', '_')
+        return out_df
+
+
+
+
+
+
+
 
 
 
@@ -147,83 +222,5 @@ def get_category_playlists(category_id='', country='US', url='https://api.spotif
 
     if response.status_code == 200:
         return response.json()
-
-
-def get_playlist(url):
-    response = requests.get(
-        url=url,
-        headers={'Authorization': 'Bearer ' + get_access_token()}
-    )
-    return response.json()
-
-
-def get_entire_playlist(playlist_id='42gxpKWSAzT5k05nIzP3O2'):
-
-    url = 'https://api.spotify.com/v1/playlists/{playlist_id}/tracks'.format(playlist_id=playlist_id)
-
-    json_response = get_playlist(url)
-    df = pd.json_normalize(json_response['items'])
-    next_url = json_response['next']
-
-    while next_url is not None:
-        json_response = get_playlist(next_url)
-        df = df.append(pd.json_normalize(json_response['items']))
-        next_url = json_response['next']
-
-    return df
-
-
-ALBUM_COLS = [  # need to condense album.images
-    'track.album.id', 'track.album.name', 'track.album.album_type',
-    'track.album.release_date', 'track.album.total_tracks', 'track.album.images',
-    'track.album.href', 'track.album.uri'
-]
-
-ARTIST_COLS = [
-    'track.artists', 'track.id'
-]
-
-TRACK_COLS = [
-    'track.id', 'track.name', 'track.explicit',
-    'track.popularity', 'track.duration_ms',
-    'track.album.id', 'track.disc_number', 'track.track_number',
-    'track.href', 'track.uri'
-]
-
-PLAYLIST_COLS = [
-    'track.id', 'added_at', 'primary_color',
-    'added_by.href', 'added_by.id',
-]
-
-
-def get_playlist_details(playlist_id='42gxpKWSAzT5k05nIzP3O2'):
-
-    df = get_entire_playlist(playlist_id)
-
-    album_df = df[ALBUM_COLS]
-    artist_df = df[ARTIST_COLS]
-    playlist_df = df[PLAYLIST_COLS]
-    track_df = df[TRACK_COLS]
-
-    def expand_artist_rows(artist_row):
-        df = pd.json_normalize(artist_row['track.artists'])
-        df.insert(0, column='track.id', value=artist_row['track.id'])
-        df.insert(0, column='artist_order', value=np.arange(len(df)))
-        return df
-
-    final_artist_df = pd.concat(
-        [expand_artist_rows(artist_df.iloc[i]) for i in range(0, len(artist_df))]
-    )
-
-    playlist_df.insert(0, column='id', value=playlist_id)
-    playlist_df.insert(1, column='track_no', value=np.arange(len(track_df)))
-
-    album_df.columns = album_df.columns.str.replace('track.album.', '')
-    album_df.columns = album_df.columns.str.replace('.', '_')
-    final_artist_df.columns = final_artist_df.columns.str.replace('.', '_')
-    playlist_df.columns = playlist_df.columns.str.replace('.', '_')
-    track_df.columns = track_df.columns.str.replace('track.', '')
-    track_df.columns = track_df.columns.str.replace('.', '_')
-
 
 
