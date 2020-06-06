@@ -49,7 +49,7 @@ class Extract:
         next_url = json_response['next']
 
         while next_url is not None:
-            json_response = get_playlist(next_url)
+            json_response = Extract.get_spotify_data(self, next_url)
             df = df.append(pd.json_normalize(json_response['items']))
             next_url = json_response['next']
 
@@ -84,17 +84,18 @@ class Transform:
     ]
 
     PLAYLIST_COLS = [
-        'track.id', 'added_at', 'primary_color',
-        'added_by.href', 'added_by.id',
+        'id', 'track_no', 'track.id', 'added_at', 'primary_color',
+        'added_by.href', 'added_by.id'
     ]
 
     def __init__(self, what, params_list):
+        # param_list is a list of dicts, e.g. Transform('playlist', [{'playlist_id': '42gxpKWSAzT5k05nIzP3O2'}])
 
         extract_obj = Extract()
         self.what = what
         self.params_list = params_list
 
-        self.data = [extract_obj.extract_spotify_data('playlist', params=params) for params in params_list]  # if check_condition(params)
+        self.data = [extract_obj.extract_spotify_data(self.what, params=params) for params in self.params_list]  # if check_condition(params)
 
         self.albums = [Transform.get_album_from_playlist(df=df) for df in self.data]
         self.artists = [Transform.get_artist_from_playlist(df=df) for df in self.data]
@@ -103,7 +104,16 @@ class Transform:
 
     @staticmethod
     def get_album_from_playlist(df):
+
+        def expand_image_rows(album_row):
+            album_row['track.album.image'] = album_row['track.album.images'][0]['url']
+            album_row = album_row.drop('track.album.images')
+            return album_row
+
         out_df = df[Transform.ALBUM_COLS]
+        out_df = pd.concat(
+            [expand_image_rows(out_df.iloc[i]) for i in range(0, len(out_df))], axis=1
+        ).transpose()
         out_df.columns = out_df.columns.str.replace('track.album.', '')
         out_df.columns = out_df.columns.str.replace('.', '_')
         return out_df
