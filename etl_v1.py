@@ -105,15 +105,12 @@ class Transform:
     @staticmethod
     def get_album_from_playlist(df):
 
-        def expand_image_rows(album_row):
+        def extract_first_image(album_row):
             album_row['track.album.image'] = album_row['track.album.images'][0]['url']
-            album_row = album_row.drop('track.album.images')
             return album_row
 
         out_df = df[Transform.ALBUM_COLS]
-        out_df = pd.concat(
-            [expand_image_rows(out_df.iloc[i]) for i in range(0, len(out_df))], axis=1
-        ).transpose()
+        out_df = out_df.apply(extract_first_image, axis=1).drop(columns='track.album.images')
         out_df.columns = out_df.columns.str.replace('track.album.', '')
         out_df.columns = out_df.columns.str.replace('.', '_')
         return out_df
