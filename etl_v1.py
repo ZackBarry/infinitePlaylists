@@ -95,15 +95,23 @@ class Transform:
         self.what = what
         self.params_list = params_list
 
-        self.data = [extract_obj.extract_spotify_data(self.what, params=params) for params in self.params_list]  # if check_condition(params)
+        data = [extract_obj.extract_spotify_data(self.what, params=params) for params in self.params_list]  # if check_condition(params)
 
-        self.albums = [Transform.get_album_from_playlist(df=df) for df in self.data]
-        self.artists = [Transform.get_artist_from_playlist(df=df) for df in self.data]
-        self.playlists = [Transform.get_playlist_from_playlist(df=df) for df in self.data]
-        self.track = [Transform.get_tracks_from_playlist(df=df) for df in self.data]
+        self.albums = pd.concat(
+            [Transform.get_albums_from_playlist(df=df) for df in data]
+        )
+        self.artists = pd.concat(
+            [Transform.get_artists_from_playlist(df=df) for df in data]
+        )
+        self.playlists = pd.concat(
+            [Transform.get_playlist_from_playlist(df=df) for df in data]
+        )
+        self.tracks = pd.concat(
+            [Transform.get_tracks_from_playlist(df=df) for df in data]
+        )
 
     @staticmethod
-    def get_album_from_playlist(df):
+    def get_albums_from_playlist(df):
 
         def extract_first_image(album_row):
             album_row['track.album.image'] = album_row['track.album.images'][0]['url']
@@ -116,7 +124,7 @@ class Transform:
         return out_df
 
     @staticmethod
-    def get_artist_from_playlist(df):
+    def get_artists_from_playlist(df):
 
         def expand_artist_rows(artist_row):
             artist_df = pd.json_normalize(artist_row['track.artists'])
@@ -146,6 +154,13 @@ class Transform:
         return out_df
 
 
+class Load:
+
+    def __init__(self, s3_bucket):
+
+        
+
+    def
 
 
 
