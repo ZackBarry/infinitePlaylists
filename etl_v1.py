@@ -52,10 +52,10 @@ class Extract:
         )
         return response.json()
 
-    def get_playlist_data(self, params):
+    def get_playlist_data(self, playlist_id):
         # playlist_id='42gxpKWSAzT5k05nIzP3O2'
 
-        url = 'https://api.spotify.com/v1/playlists/{playlist_id}/tracks'.format(playlist_id=params['playlist_id'])
+        url = 'https://api.spotify.com/v1/playlists/{playlist_id}/tracks'.format(playlist_id=playlist_id)
 
         json_response = Extract.get_spotify_data(self, url)
         df = pd.json_normalize(json_response['items'])
@@ -66,7 +66,7 @@ class Extract:
             df = df.append(pd.json_normalize(json_response['items']))
             next_url = json_response['next']
 
-        df.insert(0, column='id', value=params['playlist_id'])
+        df.insert(0, column='id', value=playlist_id)
         df.insert(0, column='track_no', value=np.arange(len(df)))
         return df
 
@@ -102,7 +102,7 @@ class Transform:
     ]
 
     def __init__(self, what, params_list):
-        # param_list is a list of dicts, e.g. Transform('playlist', [{'playlist_id': '42gxpKWSAzT5k05nIzP3O2'}])
+        # param_list is a list of dicts, e.g. Transform('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'])
 
         extract_obj = Extract()
         self.what = what
@@ -173,7 +173,7 @@ class Load:
 
     def __init__(self, what, params_list, s3_bucket_name):
 
-        self.now = datetime.now().strftime('%d%m%y_%h%m%s')
+        self.now = datetime.now().strftime('%d%m%y_%H%M%S')
 
         Load.check_or_add_bucket(s3_bucket_name)
         self.s3_bucket_name = s3_bucket_name
@@ -188,7 +188,7 @@ class Load:
                 data_type=key,
                 timestamp=self.now
             )
-            self.transform_obj.data[key].to_sc(file_name, index=False)
+            self.transform_obj.data[key].to_csv(file_name, index=False)
 
     @staticmethod
     def check_or_add_bucket(s3_bucket_name):
