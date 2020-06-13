@@ -2,13 +2,9 @@ import requests
 import config as C
 import pandas as pd
 import numpy as np
-import logging
-import json
 from datetime import datetime
 from time import time
 import boto3
-import os
-import re
 
 
 class Extract:
@@ -170,6 +166,8 @@ class Transform:
 
 
 class Load:
+
+    # Load('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'], 'infinite-playlists')
 
     def __init__(self, what, params_list, s3_bucket_name):
 
