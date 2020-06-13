@@ -39,7 +39,7 @@ class Extract:
 
         now = int(time())  # seconds since Epoch
 
-        if self.access_token_time is None or now > self.access_token_time + 40:  # refresh 1x per hour (with 200s margin)
+        if self.access_token_time is None or now > self.access_token_time + 3400:  # refresh 1x per hour (with 200s margin)
             self.access_token_time = now
             self.access_token_string = self.get_access_token()
 
