@@ -41,34 +41,46 @@ class Extract:
 
         return self.access_token_string
 
-    def get_spotify_data(self, url):
+    def get_spotify_data(self, url, params=None):
         response = requests.get(
             url=url,
-            headers={'Authorization': 'Bearer ' + self.access_token()}
+            headers={'Authorization': 'Bearer ' + self.access_token()},
+            params=params
         )
         return response.json()
 
-    def get_playlist_data(self, playlist_id):
-        # playlist_id='42gxpKWSAzT5k05nIzP3O2'
-
+    def get_playlist_tracks(self, playlist_id):
         url = 'https://api.spotify.com/v1/playlists/{playlist_id}/tracks'.format(playlist_id=playlist_id)
 
-        json_response = Extract.get_spotify_data(self, url)
+        json_response = self.get_spotify_data(url)
         df = pd.json_normalize(json_response['items'])
         next_url = json_response['next']
 
         while next_url is not None:
-            json_response = Extract.get_spotify_data(self, next_url)
+            json_response = self.get_spotify_data(next_url)
             df = df.append(pd.json_normalize(json_response['items']))
             next_url = json_response['next']
 
-        df.insert(0, column='id', value=playlist_id)
         df.insert(0, column='track_no', value=np.arange(len(df)))
         return df
 
+    def get_playlist_metadata(self, playlist_id):
+        url = 'https://api.spotify.com/v1/playlists/{playlist_id}'.format(playlist_id=playlist_id)
+        params = {'fields': 'id,name,owner,description,followers'}
+        json_response = self.get_spotify_data(url, params)
+        return pd.json_normalize(json_response)
+
+    def get_playlist_data(self, playlist_id):
+        # playlist_id='42gxpKWSAzT5k05nIzP3O2'
+
+        metadata = self.get_playlist_metadata(playlist_id)
+        tracks = self.get_playlist_tracks(playlist_id)
+
+        return metadata.assign(foo=1).merge(tracks.assign(foo=1)).drop('foo', 1).reset_index()
+
     def extract_spotify_data(self, what, params):
         if what == 'playlist':
-            return Extract.get_playlist_data(self, params)
+            return self.get_playlist_data(params)
         else:
             return -1
 
@@ -91,7 +103,7 @@ class Transform:
         'track.album.id', 'track.disc_number', 'track.track_number',
         'track.href', 'track.uri'
     ]
-
+    # TODO: update playlist columns to include more metadata
     PLAYLIST_COLS = [
         'id', 'track_no', 'track.id', 'added_at', 'primary_color',
         'added_by.href', 'added_by.id'
