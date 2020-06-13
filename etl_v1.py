@@ -5,6 +5,8 @@ import numpy as np
 import logging
 import json
 from datetime import datetime
+from time import time
+import boto3
 import os
 import re
 
@@ -14,10 +16,11 @@ class Extract:
     def __init__(self):
         self.client_id = C.default['client_id']
         self.client_secret = C.default['client_secret']
+        self.access_token_time = None
+        self.access_token_string = None
 
     def get_access_token(self):
-        # use global variable so that only refreshes once every 3600 seconds (once per hour)
-        # https://developer.spotify.com/documentation/ios/guides/token-swap-and-refresh/
+
         url = 'https://accounts.spotify.com/api/token'
         body_params = {'grant_type': 'client_credentials'}
 
@@ -32,10 +35,20 @@ class Extract:
         else:
             print(f"{response.status_code} Error in API call")
 
+    def access_token(self):
+
+        now = int(time())  # seconds since Epoch
+
+        if self.access_token_time is None or now > self.access_token_time + 40:  # refresh 1x per hour (with 200s margin)
+            self.access_token_time = now
+            self.access_token_string = self.get_access_token()
+
+        return self.access_token_string
+
     def get_spotify_data(self, url):
         response = requests.get(
             url=url,
-            headers={'Authorization': 'Bearer ' + Extract.get_access_token(self)}
+            headers={'Authorization': 'Bearer ' + self.access_token()}
         )
         return response.json()
 
@@ -95,19 +108,21 @@ class Transform:
         self.what = what
         self.params_list = params_list
 
-        data = [extract_obj.extract_spotify_data(self.what, params=params) for params in self.params_list]  # if check_condition(params)
+        raw_data = [extract_obj.extract_spotify_data(self.what, params=params) for params in self.params_list]  # if check_condition(params)
 
-        self.albums = pd.concat(
-            [Transform.get_albums_from_playlist(df=df) for df in data]
+        self.data = {}
+
+        self.data['albums'] = pd.concat(
+            [Transform.get_albums_from_playlist(df=df) for df in raw_data]
         )
-        self.artists = pd.concat(
-            [Transform.get_artists_from_playlist(df=df) for df in data]
+        self.data['artists'] = pd.concat(
+            [Transform.get_artists_from_playlist(df=df) for df in raw_data]
         )
-        self.playlists = pd.concat(
-            [Transform.get_playlist_from_playlist(df=df) for df in data]
+        self.data['playlists'] = pd.concat(
+            [Transform.get_playlist_from_playlist(df=df) for df in raw_data]
         )
-        self.tracks = pd.concat(
-            [Transform.get_tracks_from_playlist(df=df) for df in data]
+        self.data['tracks'] = pd.concat(
+            [Transform.get_tracks_from_playlist(df=df) for df in raw_data]
         )
 
     @staticmethod
@@ -156,9 +171,31 @@ class Transform:
 
 class Load:
 
-    def __init__(self, s3_bucket):
+    def __init__(self, what, params_list, s3_bucket_name):
+
+        self.now = datetime.now().strftime('%d%m%y_%h%m%s')
+
+        Load.check_or_add_bucket(s3_bucket_name)
+        self.s3_bucket_name = s3_bucket_name
+
+        self.transform_obj = Transform(what, params_list)
+
+    def load(self):
+
+        for key in self.transform_obj.data.keys():
+            file_name = 's3://{bucket_name}/{data_type}/{timestamp}.csv'.format(
+                bucket_name=self.s3_bucket_name,
+                data_type=key,
+                timestamp=self.now
+            )
+            self.transform_obj.data[key].to_sc(file_name, index=False)
+
+    @staticmethod
+    def check_or_add_bucket(s3_bucket_name):
+        s3 = boto3.resource('s3')
+        if s3.Bucket(s3_bucket_name) not in s3.buckets.all():
+            s3.create_bucket(Bucket=s3_bucket_name, CreateBucketConfiguration={
+                'LocationConstraint': 'us-west-2'})
 
 
-
-    def
 
