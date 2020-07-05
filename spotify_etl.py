@@ -1,5 +1,5 @@
 import requests
-import config as C
+import config as config
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -20,11 +20,21 @@ class Extract:
         Seconds from epoch to when a Spotify access token was created
     access_token_string : str
         Access token for Spotify API
+
+    Notes
+    -----
+    * A config module containing a dict named `default` with keys 'client_id' and 'client_secret' containing
+    Spotify API credentials is required for this class
+    * Spotify Playlist data is currently the only supported API return type.  Extending to other other returns
+    will be added as needed
     """
 
     def __init__(self):
-        self.client_id = C.default['client_id']
-        self.client_secret = C.default['client_secret']
+        """Retrieve Spotify API Client ID and Client Secret from config.py module
+        """
+
+        self.client_id = config.default['client_id']
+        self.client_secret = config.default['client_secret']
         self.access_token_time = None
         self.access_token_string = None
 
@@ -72,8 +82,6 @@ class Extract:
         Returns
         -------
         pandas.core.frame.DataFrame
-
-
         """
 
         response = requests.get(
@@ -171,7 +179,8 @@ class Extract:
         Returns
         -------
         pandas.core.frame.DataFrame
-            Spotify data sourced from API JSON response(s)"""
+            Spotify data sourced from API JSON response(s)
+        """
 
         if what == 'playlist':
             return self.get_playlist_data(params)
@@ -180,8 +189,24 @@ class Extract:
 
 
 class Transform:
+    """Wrangles Spotify API results in order to extract various features such as Artists or Albums
 
-    ALBUM_COLS = [  # need to condense album.images
+    Attributes
+    ----------
+    what : str
+        The type of Spotify API object to retrieve (currently, only "playlist" is supported)
+    params_list : list
+        Each element of list is a parameter set relevant to `what` (e.g. playlist IDs)
+    data : dict
+        Wrangled data related to a given Spotify feature (e.g. data['albums'])
+
+    Notes
+    -----
+    Spotify Playlist data is currently the only supported API return type.  Extending to other other returns will
+    be added as needed.
+    """
+
+    ALBUM_COLS = [  # TODO: need to condense album.images
         'track.album.id', 'track.album.name', 'track.album.album_type',
         'track.album.release_date', 'track.album.total_tracks', 'track.album.images',
         'track.album.href', 'track.album.uri'
@@ -204,7 +229,19 @@ class Transform:
     ]
 
     def __init__(self, what, params_list):
-        # param_list is a list of dicts, e.g. Transform('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'])
+        """Extracts and combines Spotify API data for additional wrangling scripts
+        
+        Examples
+        --------
+        Transform('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'])
+
+        Parameters
+        ----------
+        what : str
+            The type of Spotify API object to retrieve (currently, only "playlist" is supported)
+        params_list : list
+            Either a list of strings or a list of dicts containing additional parameters for API get request(s)
+        """
 
         extract_obj = Extract()
         self.what = what
@@ -229,8 +266,21 @@ class Transform:
 
     @staticmethod
     def get_albums_from_playlist(df):
+        """Extract and format relevant album columns from Playlist DataFrame
+
+        Parameters
+        ----------
+        df : pandas.core.frame.DataFrame
+            Contains all of the columns in ALBUM_COLS
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+            Subset of album columns from `df`
+        """
 
         def extract_first_image(album_row):
+            # The "track.album.image" column contains multiple image urls, only 1 is needed.
             album_row['track.album.image'] = album_row['track.album.images'][0]['url']
             return album_row
 
@@ -242,8 +292,21 @@ class Transform:
 
     @staticmethod
     def get_artists_from_playlist(df):
+        """Extract and format relevant artist columns from Playlist DataFrame
+
+        Parameters
+        ----------
+        df : pandas.core.frame.DataFrame
+            Contains all of the columns in ARTIST_COLS
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+            Subset of artist columns from `df`
+        """
 
         def expand_artist_rows(artist_row):
+            # A track may have multiple artists; they should each get their own row.
             artist_df = pd.json_normalize(artist_row['track.artists'])
             artist_df.insert(0, column='track.id', value=artist_row['track.id'])
             artist_df.insert(0, column='artist_order', value=np.arange(len(artist_df)))
@@ -259,12 +322,38 @@ class Transform:
 
     @staticmethod
     def get_playlist_from_playlist(df):
+        """Extract and format relevant playlist columns from Playlist DataFrame
+
+        Parameters
+        ----------
+        df : pandas.core.frame.DataFrame
+            Contains all of the columns in PLAYLIST_COLS
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+            Subset of playlist columns from `df`
+        """
+
         out_df = df[Transform.PLAYLIST_COLS]
         out_df.columns = out_df.columns.str.replace('.', '_')
         return out_df
 
     @staticmethod
     def get_tracks_from_playlist(df):
+        """Extract and format relevant track columns from Playlist DataFrame
+
+        Parameters
+        ----------
+        df : pandas.core.frame.DataFrame
+            Contains all of the columns in TRACK_COLS
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+            Subset of track columns from `df`
+        """
+
         out_df = df[Transform.TRACK_COLS]
         out_df.columns = out_df.columns.str.replace('track.', '')
         out_df.columns = out_df.columns.str.replace('.', '_')
