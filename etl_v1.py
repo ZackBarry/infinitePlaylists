@@ -8,6 +8,19 @@ import boto3
 
 
 class Extract:
+    """Extract various Spotify data via the Spotify API.  API credentials required.
+
+    Attributes
+    ----------
+    client_id : str
+        Spotify client id, obtained by registering an App with Spotify
+    client_secret: str
+        Spotify client secret, obtained by registering an App with Spotify
+    access_token_time : int
+        Seconds from epoch to when a Spotify access token was created
+    access_token_string : str
+        Access token for Spotify API
+    """
 
     def __init__(self):
         self.client_id = C.default['client_id']
@@ -16,40 +29,74 @@ class Extract:
         self.access_token_string = None
 
     def get_access_token(self):
+        """Retrieves a new Spotify API access token every 3400 seconds
 
-        url = 'https://accounts.spotify.com/api/token'
-        body_params = {'grant_type': 'client_credentials'}
+        Spotify API access tokens are valid for 1 hr (3600 seconds).  An access token is stored in
+        `self.access_token_string` until the difference between the current time and
+        `self.access_token_time` exceeds 3400 seconds.
 
-        response = requests.post(url, data=body_params, auth=(self.client_id, self.client_secret))
+        Returns
+        -------
+        str
+            API access token
+        """
 
-        if response.status_code == 200:
+        now = int(time())  # seconds since epoch
 
-            # Get the json data
-            json_data = response.json()
-            return json_data['access_token']
-
-        else:
-            print(f"{response.status_code} Error in API call")
-
-    def access_token(self):
-
-        now = int(time())  # seconds since Epoch
-
-        if self.access_token_time is None or now > self.access_token_time + 3400:  # refresh 1x per hour (with 200s margin)
+        # Check if the token needs to be refreshed.
+        if self.access_token_time is None or now > self.access_token_time + 3400:
             self.access_token_time = now
-            self.access_token_string = self.get_access_token()
+            response = requests.post(
+                url='https://accounts.spotify.com/api/token',
+                data={'grant_type': 'client_credentials'},
+                auth=(self.client_id, self.client_secret)
+            )
+            if response.status_code == 200:
+                self.access_token_string = response.json()['access_token']
+            else:
+                self.access_token_string = None
+                print(f"{response.status_code} Error in API call")
 
         return self.access_token_string
 
     def get_spotify_data(self, url, params=None):
+        """Sends a GET request to the Spotify API
+
+        Parameters
+        ----------
+        url : str
+            The API endpoint to hit
+        params : dict, optional
+            Additional parameters to pass in the API request
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+
+
+        """
+
         response = requests.get(
             url=url,
-            headers={'Authorization': 'Bearer ' + self.access_token()},
+            headers={'Authorization': 'Bearer ' + self.get_access_token()},
             params=params
         )
         return response.json()
 
     def get_playlist_tracks(self, playlist_id):
+        """Retrieves all tracks from a Spotify playlist
+
+        Parameters
+        ----------
+        playlist_id : str
+            Spotify ID of the playlist to retrieve
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+            Track data from the Spotify playlist, sourced from API JSON response
+        """
+
         url = 'https://api.spotify.com/v1/playlists/{playlist_id}/tracks'.format(playlist_id=playlist_id)
 
         json_response = self.get_spotify_data(url)
@@ -65,13 +112,42 @@ class Extract:
         return df
 
     def get_playlist_metadata(self, playlist_id):
+        """Retrieves metadata about a Spotify playlist
+
+        Parameters
+        ----------
+        playlist_id : str
+            Spotify ID of the playlist to retrieve
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+            Playlist metadata, sourced from API JSON response
+        """
+
         url = 'https://api.spotify.com/v1/playlists/{playlist_id}'.format(playlist_id=playlist_id)
         params = {'fields': 'id,name,owner,description,followers'}
         json_response = self.get_spotify_data(url, params)
+
         return pd.json_normalize(json_response)
 
     def get_playlist_data(self, playlist_id):
-        # playlist_id='42gxpKWSAzT5k05nIzP3O2'
+        """Retrieves metadata and track data for a Spotify playlist
+
+        Examples
+        --------
+        get_playlist_data(playlist_id='42gxpKWSAzT5k05nIzP3O2')
+
+        Parameters
+        ----------
+        playlist_id : str
+            Spotify ID of the playlist to retrieve data for
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+            Playlist metadata and track data, source from API JSON responses
+        """
 
         metadata = self.get_playlist_metadata(playlist_id)
         tracks = self.get_playlist_tracks(playlist_id)
@@ -79,6 +155,24 @@ class Extract:
         return metadata.assign(foo=1).merge(tracks.assign(foo=1)).drop('foo', 1).reset_index()
 
     def extract_spotify_data(self, what, params):
+        """Calls the appropriate `get_xxx_data()` function(s) for the given parameters
+
+        Examples
+        --------
+        extract_spotify_data('playlist', '42gxpKWSAzT5k05nIzP3O2')
+
+        Parameters
+        ----------
+        what : str
+            Spotify object type to extract (currently, only 'playlist' is supported
+        params
+            Parameters required to access the Spotify object, an id is always required
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+            Spotify data sourced from API JSON response(s)"""
+
         if what == 'playlist':
             return self.get_playlist_data(params)
         else:
