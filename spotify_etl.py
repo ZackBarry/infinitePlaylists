@@ -160,6 +160,17 @@ class Extract:
         metadata = self.get_playlist_metadata(playlist_id)
         tracks = self.get_playlist_tracks(playlist_id)
 
+        # TODO: fix KeyError: 'genres'
+        def get_album_genre(album_id):
+            url = 'https://api.spotify.com/v1/albums/{album_id}'.format(album_id=album_id)
+            genres = self.get_spotify_data(url)['genres']
+            genre = genres[0] if len(genres) > 0 else "none"
+            return genre
+
+        tracks = tracks.assign(
+            genre=lambda df: get_album_genre(df['track.album.id'])
+        ).rename(columns={'genre': 'track.album.genre'})
+
         return metadata.assign(foo=1).merge(tracks.assign(foo=1)).drop('foo', 1).reset_index()
 
     def extract_spotify_data(self, what, params):
@@ -211,7 +222,7 @@ class Transform:
     ALBUM_COLS = [
         'track.album.id', 'track.album.name', 'track.album.album_type',
         'track.album.release_date', 'track.album.total_tracks', 'track.album.images',
-        'track.album.href', 'track.album.uri'
+        'track.album.href', 'track.album.uri', 'track.album.genre'
     ]
 
     ARTIST_COLS = [
@@ -411,7 +422,7 @@ class Load:
         """Upload each result from `transform_obj` to AWS S3 bucket
         """
 
-        for key in self.transform_obj.data.keys():
+        for key in self.transform_obj.data:
             file_name = 's3://{bucket_name}/{data_type}/{timestamp}.csv'.format(
                 bucket_name=self.s3_bucket_name,
                 data_type=key,
