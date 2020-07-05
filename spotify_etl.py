@@ -199,7 +199,8 @@ class Transform:
         Each element of list is a parameter set relevant to `what` (e.g. playlist IDs)
     data : dict
         Wrangled data related to a given Spotify feature (e.g. data['albums'])
-    TODO: add extract_obj to self
+    extract_obj : spotify_etl.Extract
+        Handles the API extraction 
 
     Notes
     -----
@@ -207,7 +208,7 @@ class Transform:
     be added as needed.
     """
 
-    ALBUM_COLS = [  # TODO: need to condense album.images
+    ALBUM_COLS = [
         'track.album.id', 'track.album.name', 'track.album.album_type',
         'track.album.release_date', 'track.album.total_tracks', 'track.album.images',
         'track.album.href', 'track.album.uri'
@@ -244,11 +245,11 @@ class Transform:
             Either a list of strings or a list of dicts containing additional parameters for API get request(s)
         """
 
-        extract_obj = Extract()
+        self.extract_obj = Extract()
         self.what = what
         self.params_list = params_list
 
-        raw_data = [extract_obj.extract_spotify_data(self.what, params=params) for params in self.params_list]  # if check_condition(params)
+        raw_data = [self.extract_obj.extract_spotify_data(self.what, params=params) for params in self.params_list]  # if check_condition(params)
 
         self.data = {}
 
