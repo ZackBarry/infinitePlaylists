@@ -142,10 +142,6 @@ class Extract:
     def get_playlist_data(self, playlist_id):
         """Retrieves metadata and track data for a Spotify playlist
 
-        Examples
-        --------
-        get_playlist_data(playlist_id='42gxpKWSAzT5k05nIzP3O2')
-
         Parameters
         ----------
         playlist_id : str
@@ -155,6 +151,10 @@ class Extract:
         -------
         pandas.core.frame.DataFrame
             Playlist metadata and track data, source from API JSON responses
+
+        Examples
+        --------
+        get_playlist_data(playlist_id='42gxpKWSAzT5k05nIzP3O2')
         """
 
         metadata = self.get_playlist_metadata(playlist_id)
@@ -164,10 +164,6 @@ class Extract:
 
     def extract_spotify_data(self, what, params):
         """Calls the appropriate `get_xxx_data()` function(s) for the given parameters
-
-        Examples
-        --------
-        extract_spotify_data('playlist', '42gxpKWSAzT5k05nIzP3O2')
 
         Parameters
         ----------
@@ -180,6 +176,10 @@ class Extract:
         -------
         pandas.core.frame.DataFrame
             Spotify data sourced from API JSON response(s)
+
+        Examples
+        --------
+        extract_spotify_data('playlist', '42gxpKWSAzT5k05nIzP3O2')
         """
 
         if what == 'playlist':
@@ -200,7 +200,7 @@ class Transform:
     data : dict
         Wrangled data related to a given Spotify feature (e.g. data['albums'])
     extract_obj : spotify_etl.Extract
-        Handles the API extraction 
+        Handles the API extraction
 
     Notes
     -----
@@ -233,16 +233,16 @@ class Transform:
     def __init__(self, what, params_list):
         """Extracts and combines Spotify API data for additional wrangling scripts
 
-        Examples
-        --------
-        Transform('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'])
-
         Parameters
         ----------
         what : str
             The type of Spotify API object to retrieve (currently, only "playlist" is supported)
         params_list : list
             Either a list of strings or a list of dicts containing additional parameters for API get request(s)
+
+        Examples
+        --------
+        Transform('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'])
         """
 
         self.extract_obj = Extract()
@@ -365,10 +365,6 @@ class Transform:
 class Load:
     """Uploads wrangled Spotify API results to an S3 bucket as CSV
 
-    Examples
-    --------
-    Load('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'], 'infinite-playlists')
-
     Attributes
     ----------
     what : str
@@ -385,6 +381,10 @@ class Load:
     Notes
     -----
     AWS credentials must be configured on the machine on which this class is to be used
+
+    Examples
+    --------
+    Load('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'], 'infinite-playlists')
     """
 
     def __init__(self, what, params_list, s3_bucket_name):
