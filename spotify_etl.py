@@ -199,6 +199,7 @@ class Transform:
         Each element of list is a parameter set relevant to `what` (e.g. playlist IDs)
     data : dict
         Wrangled data related to a given Spotify feature (e.g. data['albums'])
+    TODO: add extract_obj to self
 
     Notes
     -----
@@ -230,7 +231,7 @@ class Transform:
 
     def __init__(self, what, params_list):
         """Extracts and combines Spotify API data for additional wrangling scripts
-        
+
         Examples
         --------
         Transform('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'])
@@ -361,10 +362,42 @@ class Transform:
 
 
 class Load:
+    """Uploads wrangled Spotify API results to an S3 bucket as CSV
 
-    # Load('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'], 'infinite-playlists')
+    Examples
+    --------
+    Load('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'], 'infinite-playlists')
+
+    Attributes
+    ----------
+    what : str
+        The type of Spotify API object to retrieve (currently, only "playlist" is supported)
+    params_list : list
+        Either a list of strings or a list of dicts containing additional parameters for API get request(s)
+    s3_bucket_name : str
+        Name of an AWS S3 bucket to upload resulting CSV(s) to
+    now : str
+        Time when object instantiated; used for determining CSV file names
+    transform_obj : spotify_etl.Transform
+        Handles the API result wrangling (and extraction through spotify_etl.Extract)
+
+    Notes
+    -----
+    AWS credentials must be configured on the machine on which this class is to be used
+    """
 
     def __init__(self, what, params_list, s3_bucket_name):
+        """Ensure S3 bucket exists; instantiate Transform object.
+
+        Parameters
+        ----------
+        what : str
+            The type of Spotify API object to retrieve (currently, only "playlist" is supported)
+        params_list : list
+            Either a list of strings or a list of dicts containing additional parameters for API get request(s)
+        s3_bucket_name : str
+            Name of an AWS S3 bucket to upload resulting CSV(s) to
+        """
 
         self.now = datetime.now().strftime('%d%m%y_%H%M%S')
 
@@ -374,6 +407,8 @@ class Load:
         self.transform_obj = Transform(what, params_list)
 
     def load(self):
+        """Upload each result from `transform_obj` to AWS S3 bucket
+        """
 
         for key in self.transform_obj.data.keys():
             file_name = 's3://{bucket_name}/{data_type}/{timestamp}.csv'.format(
@@ -385,10 +420,15 @@ class Load:
 
     @staticmethod
     def check_or_add_bucket(s3_bucket_name):
+        """Check that an S3 bucket exists in S3; add if not
+
+        Parameters
+        ----------
+        s3_bucket_name : str
+            Name of an AWS S3 bucket
+        """
+
         s3 = boto3.resource('s3')
         if s3.Bucket(s3_bucket_name) not in s3.buckets.all():
             s3.create_bucket(Bucket=s3_bucket_name, CreateBucketConfiguration={
                 'LocationConstraint': 'us-west-2'})
-
-
-
