@@ -400,7 +400,7 @@ class Load:
             Name of an AWS S3 bucket to upload resulting CSV(s) to
         """
 
-        self.now = datetime.now().strftime('%d%m%y_%H%M%S')
+        self.now = datetime.now().strftime('%m%d%y_%H%M%S')
 
         Load.check_or_add_bucket(s3_bucket_name)
         self.s3_bucket_name = s3_bucket_name
