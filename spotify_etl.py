@@ -160,6 +160,7 @@ class Extract:
         metadata = self.get_playlist_metadata(playlist_id)
         tracks = self.get_playlist_tracks(playlist_id)
 
+        # TODO: parallelize with https://github.com/jmcarpenter2/swifter/blob/master/docs/documentation.md#10-pandasdataframeswifterallow_dask_on_stringsenabletrueapply
         def get_album_genre(album_id):
             url = 'https://api.spotify.com/v1/albums/{album_id}'.format(album_id=album_id)
             genres = self.get_spotify_data(url)['genres']
