@@ -160,16 +160,13 @@ class Extract:
         metadata = self.get_playlist_metadata(playlist_id)
         tracks = self.get_playlist_tracks(playlist_id)
 
-        # TODO: fix KeyError: 'genres'
         def get_album_genre(album_id):
             url = 'https://api.spotify.com/v1/albums/{album_id}'.format(album_id=album_id)
             genres = self.get_spotify_data(url)['genres']
             genre = genres[0] if len(genres) > 0 else "none"
             return genre
 
-        tracks = tracks.assign(
-            genre=lambda df: get_album_genre(df['track.album.id'])
-        ).rename(columns={'genre': 'track.album.genre'})
+        tracks['track.album.genre'] = tracks['track.album.id'].apply(get_album_genre)
 
         return metadata.assign(foo=1).merge(tracks.assign(foo=1)).drop('foo', 1).reset_index()
 
