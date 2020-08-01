@@ -51,7 +51,7 @@ class Extract:
             API access token
         """
 
-        now = int(time())  # seconds since epoch
+        now = int(time.time())  # seconds since epoch
 
         # Check if the token needs to be refreshed.
         if self.access_token_time is None or now > self.access_token_time + 3400:
@@ -139,6 +139,34 @@ class Extract:
 
         return pd.json_normalize(json_response)
 
+    def get_artists_genres(self, artist_ids):
+        """Retrieves artist information for a list of Spotify artist ids
+
+        Parameters
+        ----------
+        artist_ids : list[str]
+            List of Spotify album IDs to retrieve data for
+
+        Returns
+        -------
+        pandas.core.frame.DataFrame
+            Artist data, sourced from API JSON responses
+
+        Examples
+        --------
+        get_artist_genres(artist_ids: ['1W8TbFzNS15VwsempfY12H'])
+        """
+
+        unique_artist_ids = list(set(artist_ids))
+        # Can request up to 20 artists at a time from Spotify API
+        twenty_ids = [unique_artist_ids[i:i + 20] for i in range(0, len(unique_artist_ids), 20)]
+        params = [','.join(ids) for ids in twenty_ids]
+        responses = [self.get_spotify_data('https://api.spotify.com/v1/artists', params={'ids': param}) for param in params]
+        artist_lists = [response['artists'] for response in responses]
+        single_artist_list = [item for sublist in artist_lists for item in sublist]
+
+        return pd.json_normalize(single_artist_list)
+
     def get_playlist_data(self, playlist_id):
         """Retrieves metadata and track data for a Spotify playlist
 
@@ -150,7 +178,7 @@ class Extract:
         Returns
         -------
         pandas.core.frame.DataFrame
-            Playlist metadata and track data, source from API JSON responses
+            Playlist metadata and track data, sourced from API JSON responses
 
         Examples
         --------
@@ -159,15 +187,6 @@ class Extract:
 
         metadata = self.get_playlist_metadata(playlist_id)
         tracks = self.get_playlist_tracks(playlist_id)
-
-        # TODO: parallelize with https://github.com/jmcarpenter2/swifter/blob/master/docs/documentation.md#10-pandasdataframeswifterallow_dask_on_stringsenabletrueapply
-        def get_album_genre(album_id):
-            url = 'https://api.spotify.com/v1/albums/{album_id}'.format(album_id=album_id)
-            genres = self.get_spotify_data(url)['genres']
-            genre = genres[0] if len(genres) > 0 else "none"
-            return genre
-
-        tracks['track.album.genre'] = tracks['track.album.id'].apply(get_album_genre)
 
         return metadata.assign(foo=1).merge(tracks.assign(foo=1)).drop('foo', 1).reset_index()
 
@@ -220,7 +239,7 @@ class Transform:
     ALBUM_COLS = [
         'track.album.id', 'track.album.name', 'track.album.album_type',
         'track.album.release_date', 'track.album.total_tracks', 'track.album.images',
-        'track.album.href', 'track.album.uri', 'track.album.genre'
+        'track.album.href', 'track.album.uri'
     ]
 
     ARTIST_COLS = [
@@ -258,7 +277,7 @@ class Transform:
         self.what = what
         self.params_list = params_list
 
-        raw_data = [self.extract_obj.extract_spotify_data(self.what, params=params) for params in self.params_list]  # if check_condition(params)
+        raw_data = [self.extract_obj.extract_spotify_data(self.what, params=params) for params in self.params_list]
 
         self.data = {}
 
@@ -266,7 +285,7 @@ class Transform:
             [Transform.get_albums_from_playlist(df=df) for df in raw_data]
         )
         self.data['artists'] = pd.concat(
-            [Transform.get_artists_from_playlist(df=df) for df in raw_data]
+            [Transform.get_artists_from_playlist(self, df=df) for df in raw_data]
         )
         self.data['playlists'] = pd.concat(
             [Transform.get_playlist_from_playlist(df=df) for df in raw_data]
@@ -301,8 +320,7 @@ class Transform:
         out_df.columns = out_df.columns.str.replace('.', '_')
         return out_df
 
-    @staticmethod
-    def get_artists_from_playlist(df):
+    def get_artists_from_playlist(self, df):
         """Extract and format relevant artist columns from Playlist DataFrame
 
         Parameters
@@ -327,6 +345,12 @@ class Transform:
         out_df = pd.concat(
             [expand_artist_rows(out_df.iloc[i]) for i in range(0, len(out_df))]
         )
+
+        additional_details = self.extract_obj.\
+            get_artists_genres(list(out_df['id']))[['id', 'genres', 'popularity', 'followers.total']]
+
+        out_df = out_df.merge(additional_details, on='id', how='left')
+
         out_df.columns = out_df.columns.str.replace('.', '_')
 
         return out_df
