@@ -252,9 +252,10 @@ class Transform:
         'track.album.id', 'track.disc_number', 'track.track_number',
         'track.href', 'track.uri'
     ]
-    # TODO: update playlist columns to include more metadata
+
     PLAYLIST_COLS = [
-        'id', 'track_no', 'track.id', 'added_at', 'primary_color',
+        'id', 'description', 'name', 'followers.total',
+        'track_no', 'track.id', 'added_at',
         'added_by.href', 'added_by.id'
     ]
 
