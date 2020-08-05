@@ -51,7 +51,7 @@ class Extract:
             API access token
         """
 
-        now = int(time.time())  # seconds since epoch
+        now = int(time())  # seconds since epoch
 
         # Check if the token needs to be refreshed.
         if self.access_token_time is None or now > self.access_token_time + 3400:
