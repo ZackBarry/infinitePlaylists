@@ -6,7 +6,5 @@ WORKDIR /app
 COPY requirements.txt /app
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
-COPY run_etl.py /app
-COPY spotify_etl.py /app
-COPY config.py /app
+COPY spotify_etl/* /app
 ENTRYPOINT ["python", "run_etl.py"]
