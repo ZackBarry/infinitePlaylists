@@ -1,6 +1,6 @@
 # infinitePlaylists
 
-The process of discovering new playlists and/or artists on Spotify is far from perfect. There are a limited number of suggestions on their "Discover" and "Browse" pages, and a handful of recommended songs attached to each playlist. This project aims to make discovery easier.
+The process of discovering new playlists and/or artists on Spotify is far from perfect. There are a limited number of suggestions on their "Discover" and "Browse" pages, and there are only a handful of recommended songs attached to each playlist. This project aims to make discovery easier.
 
 The steps taken to create recommendations is as follows:
 
