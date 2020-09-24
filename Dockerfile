@@ -3,7 +3,7 @@ FROM python:3.7.8-slim-buster
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y gcc=8.3.0 \
+    && apt-get install -y gcc=4:8.3.0-1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
