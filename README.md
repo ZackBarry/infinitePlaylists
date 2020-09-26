@@ -20,18 +20,15 @@ These instructions will get you a copy of the project up and running on your loc
 
 To run this code, you will need [Docker Desktop for Mac](https://hub.docker.com/editions/community/docker-ce-desktop-mac) and [AWS credentials](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) for writing to S3. AWS offers a [free-tier account](https://aws.amazon.com/free/?all-free-tier.sort-by=item.additionalFields.SortRank&all-free-tier.sort-order=asc) that will be sufficient for running the example below.
 
+Your AWS credentials should be stored at `$HOME/.aws/credentials`. They will not be baked in to the Docker image, they will be attached at run time via docker-compose.
+
 #### Loading Playlist Data to S3
 
+To load a list of playlists to an S3 bucket, start by identifying the playlist IDs (note that the playlists must be public). In the web-based Spotify playlist urls take the form `open.spotify.com/playlist/<playlist_id>`. For example, [Celtic Relaxation Music](https://open.spotify.com/playlist/42gxpKWSAzT5k05nIzP3O2) has playlist ID `42gxpKWSAzT5k05nIzP3O2`. It is not necessary to create an S3 bucket in advance; a bucket will be created with the name you provide if it does not already exist.
 
-##### Build the Docker image
-
+The following commands will create an image `infinite-playlists:<your_tag>`, spin up a docker-compose stack with AWS credentials attached, open a shell on the running container, and submit the Celtic Relaxation Music playlist for extraction to a bucket named `infinite-playlists-test`.  
 ```
-docker built -t infinite-playlists:0.1 .
-```
-
-```
-docker run \
-    -v $(HOME)/.aws/credentials:/root/.aws/credentials:ro \
-    infinite-playlists:0.1 \
-    infinite-playlists-test 42gxpKWSAzT5k05nIzP3O2
+$ make build IMAGE_TAG=<your_tag>
+$ make debug IMAGE_TAG=<your_tag>
+root@<container_id>:/app# python run_etl infinite-playlists-test 42gxpKWSAzT5k05nIzP3O2
 ```

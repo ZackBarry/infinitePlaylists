@@ -5,18 +5,19 @@ IMAGE_TAG ?= latest
 
 build: ## Build ETL Docker image.
 	@echo "Building image for ETL."
-	IMAGE_TAG=$(IMAGE_TAG) docker-compose build
+	@IMAGE_TAG=$(IMAGE_TAG) docker-compose build
 
 up: ## Spin up docker-compose stack.
 	@echo "Spinning up docker-compose stack."
-	IMAGE_TAG=$(IMAGE_TAG) docker-compose up
+	@IMAGE_TAG=$(IMAGE_TAG) docker-compose up
 
 down: ## Spin down docker-compose stack.
 	@echo "Taking down docker-compose stack."
-	docker-compose down
+	@docker-compose down
 
 debug: ## Get a bash shell for the etl service.
-	IMAGE_TAG=$(IMAGE_TAG) docker-compose \
+	@echo "Spinning up docker-compose stack and opening a bash sell for etl service."
+	@IMAGE_TAG=$(IMAGE_TAG) docker-compose \
 														-f docker-compose.yml \
 														-f docker-compose.debug.yml \
 														run etl
