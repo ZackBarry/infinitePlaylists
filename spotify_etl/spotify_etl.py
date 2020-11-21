@@ -421,7 +421,7 @@ class Load:
     Load('playlist', ['42gxpKWSAzT5k05nIzP3O2', '42gxpKWSAzT5k05nIzP3O2'], 'infinite-playlists')
     """
 
-    def __init__(self, what, params_list, s3_bucket_name):
+    def __init__(self, what, params_list, s3_bucket_name, file_prefix=''):
         """Ensure S3 bucket exists; instantiate Transform object.
 
         Parameters
@@ -432,6 +432,8 @@ class Load:
             Either a list of strings or a list of dicts containing additional parameters for API get request(s)
         s3_bucket_name : str
             Name of an AWS S3 bucket to upload resulting CSV(s) to
+        file_prefix : str
+            String to prefix CSV(s) with
         """
 
         self.now = datetime.now().strftime('%m%d%y_%H%M%S')
@@ -446,9 +448,10 @@ class Load:
         """
 
         for key in self.transform_obj.data:
-            file_name = 's3://{bucket_name}/{data_type}/{timestamp}.csv'.format(
+            file_name = 's3://{bucket_name}/{data_type}/{file_prefix}-{timestamp}.csv'.format(
                 bucket_name=self.s3_bucket_name,
                 data_type=key,
+                file_prefix=self.file_prefix,
                 timestamp=self.now
             )
             self.transform_obj.data[key].to_csv(file_name, index=False)

@@ -87,6 +87,7 @@ class RedisWQ(object):
 
         If optional args block is true and timeout is None (the default), block
         if necessary until an item is available."""
+
         if block:
             item = self._db.brpoplpush(self._main_q_key, self._processing_q_key, timeout=timeout)
         else:

@@ -17,4 +17,4 @@ RUN pip install \
 COPY spotify_etl/* ./
 COPY rediswq.py /rediswq.py
 
-CMD ["python", "worker.py"]
+CMD ["python", "run_etl.py"]
