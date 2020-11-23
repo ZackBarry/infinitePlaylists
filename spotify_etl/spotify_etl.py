@@ -1,5 +1,5 @@
 import requests
-import config as config
+import spotify_etl.config as config
 import pandas as pd
 import numpy as np
 from datetime import datetime
