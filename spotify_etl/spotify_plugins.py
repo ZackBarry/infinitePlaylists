@@ -1,11 +1,70 @@
 import requests
 import pandas as pd
 import boto3
+import time
+import base64
+import json
+
+table = boto3.resource('dynamodb').Table('infinite_playlists')
+
+
+def get_credentials():
+    # https://joshspicer.com/spotify-now-playing
+    secret_name = "spotify_api_credentials"
+    region_name = "us-west-2"
+
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    secret_value_response = client.get_secret_value(SecretId='spotify_api_credentials')
+    if 'SecretString' in secret_value_response:
+        secret_string = secret_value_response['SecretString']
+        return json.loads(secret_string)
+    else:
+        secret_string = base64.b64decode(get_secret_value_response['SecretBinary'])
+        return json.loads(secret_string)
+
+
+def refresh_access_token():
+    """Retrieves a new Spotify API access token every 3400 seconds
+
+    Spotify API access tokens are valid for 1 hr (3600 seconds).  An access token is stored in
+    `self.access_token_string` until the difference between the current time and
+    `self.access_token_time` exceeds 3400 seconds.
+
+    Returns
+    -------
+    str
+        API access token
+    """
+
+    now = int(time.time())  # seconds since epoch
+
+    credentials = get_credentials()
+
+    response = requests.post(
+        url='https://accounts.spotify.com/api/token',
+        data={'grant_type': 'client_credentials'},
+        auth=(credentials['client_id'], credentials['client_secret'])
+    )
+
+    access_token = response.json()['access_token']
+    table.put_item(Item={'scope': 'prod', 'access_token': access_token, 'expires_at': now+3400})
+
+    return access_token
 
 
 def get_access_token():
+    db_response = table.get_item(Key={'scope': 'prod'})
+    expires_at = db_response['Item']['expires_at']
 
-    return '-1'
+    if expires_at <= time.time():
+        return refresh_access_token()
+    else:
+        return db_response['Item']['access_token']
 
 
 def get_spotify_data(url, params=None):
